@@ -116,7 +116,7 @@ def draw_header(ax):
 
     # Draw the complete header grid on the provided axes
     # Top 3 rows (3 columns each)
-    top_row_height = 0.25  # Each of the 3 top rows takes 25% of axes height
+    top_row_height = 0.2  # Each of the 3 top rows takes 20% of axes height (reduced to make room for new row)
 
     # Draw top 3 rows
     for row in range(3):
@@ -170,12 +170,14 @@ def draw_header(ax):
     axes_width = 1.0  # ax spans 0-1 in x
     px_to_axes = axes_width / total_col_width_px
     x = 0.0
-    bottom_row_height = 0.25  # fraction of axes height for bottom row
+    bottom_row_height = (
+        0.2  # fraction of axes height for bottom row (reduced to make room for new row)
+    )
     for i in range(6):
         col_width = col_widths_px[i] * px_to_axes
         ax.add_patch(
             Rectangle(
-                (x, 0),  # Bottom row at y=0
+                (x, 0.2),  # Bottom row at y=0.2 to make room for new row below
                 col_width,
                 bottom_row_height,
                 edgecolor="black",
@@ -187,7 +189,7 @@ def draw_header(ax):
         title_text = bottom_labels[i]
         ax.text(
             x + col_width / 2,
-            bottom_row_height * 0.85,
+            0.2 + bottom_row_height * 0.85,
             title_text,
             va="top",
             ha="center",
@@ -197,12 +199,89 @@ def draw_header(ax):
         # Draw value (centered horizontally, lower in cell)
         ax.text(
             x + col_width / 2,
-            bottom_row_height * 0.35,
+            0.2 + bottom_row_height * 0.35,
             bottom_values[i],
             va="top",
             ha="center",
             fontsize=7,
         )
+        x += col_width
+
+    # Draw new additional row at the bottom
+    new_row_height = 0.2  # fraction of axes height for new row
+
+    # Define column widths for the new row (in relative terms)
+    new_col_widths = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.25, 0.05]
+    # Well, Depth, Type, Results, Depth, Level, Legend, Stratum, Empty
+    new_col_labels = [
+        "Well",
+        "Depth (m)",
+        "Type",
+        "Results",
+        "Depth\n(m)",
+        "Level\n(m)",
+        "Legend",
+        "Stratum Description",
+        "",
+    ]
+
+    x = 0.0
+    for i, (col_width, label) in enumerate(zip(new_col_widths, new_col_labels)):
+        # Draw cell rectangle
+        ax.add_patch(
+            Rectangle(
+                (x, 0),  # New row at very bottom (y=0)
+                col_width,
+                new_row_height,
+                edgecolor="black",
+                facecolor="none",
+                linewidth=1,
+            )
+        )
+
+        # Special handling for "Sample and In Situ Testing" merged header
+        if i == 1:  # First sub-column of the merged section
+            # Draw the merged header text spanning columns 1, 2, 3
+            merged_width = new_col_widths[1] + new_col_widths[2] + new_col_widths[3]
+            ax.text(
+                x + merged_width / 2,
+                new_row_height * 0.9,
+                "Sample and In Situ Testing",
+                va="top",
+                ha="center",
+                fontsize=7,
+                fontweight="bold",
+            )
+            # Draw horizontal line to separate merged header from sub-headers
+            ax.plot(
+                [x, x + merged_width],
+                [new_row_height * 0.6, new_row_height * 0.6],
+                "k-",
+                linewidth=1,
+            )
+
+        # Draw sub-column labels
+        if i in [1, 2, 3]:  # Sub-columns under "Sample and In Situ Testing"
+            ax.text(
+                x + col_width / 2,
+                new_row_height * 0.4,
+                label,
+                va="top",
+                ha="center",
+                fontsize=6,
+                fontweight="bold",
+            )
+        elif label:  # Other column labels
+            ax.text(
+                x + col_width / 2,
+                new_row_height / 2,
+                label,
+                va="center",
+                ha="center",
+                fontsize=7,
+                fontweight="bold",
+            )
+
         x += col_width
 
 
