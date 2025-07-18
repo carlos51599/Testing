@@ -149,7 +149,7 @@ def draw_header(ax):
                     label,
                     va="top",
                     ha="left",
-                    fontsize=7,
+                    fontsize=8,  # Increased font size
                     fontweight="bold",
                 )
 
@@ -161,7 +161,7 @@ def draw_header(ax):
                     value,
                     va="top",
                     ha="left",
-                    fontsize=7,
+                    fontsize=8,  # Increased font size
                 )
 
     # Draw bottom row rectangles and text
@@ -193,7 +193,7 @@ def draw_header(ax):
             title_text,
             va="top",
             ha="center",
-            fontsize=7,
+            fontsize=8,  # Increased font size
             fontweight="bold",
         )
         # Draw value (centered horizontally, lower in cell)
@@ -203,15 +203,16 @@ def draw_header(ax):
             bottom_values[i],
             va="top",
             ha="center",
-            fontsize=7,
+            fontsize=8,  # Increased font size
         )
         x += col_width
 
     # Draw new additional row at the bottom
     new_row_height = 0.2  # fraction of axes height for new row
 
-    # Define column widths for the new row (in relative terms)
-    new_col_widths = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.25, 0.05]
+    # Define column widths for the new row (adjusted for better text fitting)
+    # Increased proportions to accommodate longer text while maintaining relationships
+    new_col_widths = [0.08, 0.12, 0.08, 0.12, 0.08, 0.08, 0.08, 0.32, 0.04]
     # Well, Depth, Type, Results, Depth, Level, Legend, Stratum, Empty
     new_col_labels = [
         "Well",
@@ -249,7 +250,7 @@ def draw_header(ax):
                 "Sample and In Situ Testing",
                 va="top",
                 ha="center",
-                fontsize=7,
+                fontsize=8,  # Increased font size
                 fontweight="bold",
             )
             # Draw horizontal line to separate merged header from sub-headers
@@ -268,7 +269,7 @@ def draw_header(ax):
                 label,
                 va="top",
                 ha="center",
-                fontsize=6,
+                fontsize=7,  # Increased font size
                 fontweight="bold",
             )
         elif label:  # Other column labels
@@ -278,7 +279,7 @@ def draw_header(ax):
                 label,
                 va="center",
                 ha="center",
-                fontsize=7,
+                fontsize=8,  # Increased font size
                 fontweight="bold",
             )
 
@@ -286,79 +287,108 @@ def draw_header(ax):
 
 
 def plot_dummy_borehole_log():
+    # Calculate required width based on text content for A4 layout
+    # A4 width is 8.27 inches, minus margins (0.5" each side) = 7.27" usable
+    a4_usable_width = 7.27
+
     # Set header and log heights in inches
-    header_height_in = 1.5
+    header_height_in = 2.0  # Increased to accommodate better text fitting
     log_height_per_meter = 0.5  # inches per meter of log
     log_depth = DUMMY_BOREHOLE_DATA["Depth_Base"].max()
     log_height_in = log_depth * log_height_per_meter
-    fig_width_in = 6  # Increased width for better text fit
-    fig_height_in = header_height_in + log_height_in
+
+    # Use A4 usable width for the figure
+    fig_width_in = a4_usable_width
+    fig_height_in = header_height_in + log_height_in + 0.5  # Add bottom margin
 
     fig = plt.figure(figsize=(fig_width_in, fig_height_in))
 
-    # Axes placement: [left, bottom, width, height] in 0-1 figure coordinates
+    # Use two perfectly aligned axes: one for header, one for log
+    margin = 0.02  # 2% margin on each side
+    axes_left = margin
+    axes_width = 1 - 2 * margin
+    header_height_frac = header_height_in / fig_height_in
+    log_height_frac = 1 - header_height_frac - margin
+    # Header axes (top)
     header_ax = fig.add_axes(
         [
-            0.08,
-            1 - header_height_in / fig_height_in,
-            0.84,
-            header_height_in / fig_height_in,
+            axes_left,
+            1 - header_height_frac,
+            axes_width,
+            header_height_frac - margin / 2,
         ]
     )
     draw_header(header_ax)
-
+    header_ax.set_xlim(0, 1)
+    header_ax.set_ylim(0, 1)
+    header_ax.axis("off")
+    # Log axes (bottom)
     log_ax = fig.add_axes(
         [
-            0.08,
-            0.08,
-            0.84,
-            (fig_height_in - header_height_in - 0.08 * fig_height_in) / fig_height_in,
+            axes_left,
+            margin,
+            axes_width,
+            log_height_frac,
         ]
     )
+    from matplotlib.patches import Rectangle as MplRectangle
+
+    log_ax.add_patch(
+        MplRectangle((0, 0), 1, 1, fill=False, edgecolor="red", linewidth=1, zorder=10)
+    )
+    log_ax.set_xlim(0, 1)
+    log_ax.set_ylim(0, 1)
+    log_ax.axis("off")
+    # Now plot the lithology bars and text in the log area, using the same normalized coordinates
+    col_props = [0.08, 0.12, 0.08, 0.12, 0.08, 0.08, 0.08, 0.32, 0.04]
+    col_x = [0]
+    for w in col_props:
+        col_x.append(col_x[-1] + w)
+    bar_left = col_x[7]
+    bar_width = col_props[7]
+    desc_x = bar_left + 0.01
+    code_x = bar_left + bar_width * 0.15
+    log_depth = DUMMY_BOREHOLE_DATA["Depth_Base"].max()
+
+    def depth_to_y(depth):
+        return 1 - depth / log_depth
 
     for i, row in DUMMY_BOREHOLE_DATA.iterrows():
-        log_ax.barh(
-            y=(row["Depth_Top"] + row["Depth_Base"]) / 2,
-            width=0.8,
-            height=row["Depth_Base"] - row["Depth_Top"],
-            left=0.1,
-            color="#b0c4de",
-            edgecolor="black",
-            label=row["Geology_Code"] if i == 0 else "",
+        y_top = depth_to_y(row["Depth_Top"])
+        y_base = depth_to_y(row["Depth_Base"])
+        y_center = (y_top + y_base) / 2
+        log_ax.add_patch(
+            MplRectangle(
+                (bar_left + bar_width * 0.025, y_base),
+                bar_width * 0.95,
+                y_top - y_base,
+                facecolor="#b0c4de",
+                edgecolor="black",
+                linewidth=1,
+                zorder=2,
+            )
         )
         log_ax.text(
-            0.5,
-            (row["Depth_Top"] + row["Depth_Base"]) / 2,
+            code_x,
+            y_center,
             f"{row['Geology_Code']}",
             va="center",
-            ha="center",
+            ha="left",
             fontsize=8,
             color="black",
             fontweight="bold",
+            zorder=3,
         )
         log_ax.text(
-            1.0,
-            (row["Depth_Top"] + row["Depth_Base"]) / 2,
+            desc_x + bar_width * 0.18,
+            y_center,
             row["Description"],
             va="center",
             ha="left",
             fontsize=7,
             color="black",
+            zorder=3,
         )
-    log_ax.set_ylim(DUMMY_BOREHOLE_DATA["Depth_Base"].max(), 0)
-    log_ax.set_xlim(0, 3)
-    log_ax.set_xlabel("")
-    log_ax.set_ylabel("Depth (m)")
-    log_ax.set_yticks(
-        DUMMY_BOREHOLE_DATA["Depth_Top"].tolist()
-        + [DUMMY_BOREHOLE_DATA["Depth_Base"].iloc[-1]]
-    )
-    log_ax.set_yticklabels(
-        [f"{d:.2f}" for d in DUMMY_BOREHOLE_DATA["Depth_Top"].tolist()]
-        + [f"{DUMMY_BOREHOLE_DATA['Depth_Base'].iloc[-1]:.2f}"]
-    )
-    log_ax.set_xticks([])
-    log_ax.set_title("Dummy Borehole Log")
 
     plt.show()
     plt.close(fig)
