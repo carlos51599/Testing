@@ -390,7 +390,8 @@ def plot_dummy_borehole_log():
             zorder=3,
         )
 
-    plt.show()
+    # Save as A4-sized PNG image with 300 DPI
+    fig.savefig("borehole_log_output.png", dpi=300, bbox_inches="tight")
     plt.close(fig)
 
 
