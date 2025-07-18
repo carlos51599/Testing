@@ -358,11 +358,9 @@ def plot_dummy_borehole_log():
     for w in log_col_widths:
         log_col_x.append(log_col_x[-1] + w)
 
-    # Draw vertical lines for each column boundary, skipping those that would cut through the merged 'Sample and In Situ Testing' cell
-    # The merged cell spans columns 1, 2, 3 (indices 1, 2, 3), so skip boundaries at log_col_x[2] and log_col_x[3]
+    # Draw vertical lines for each column boundary, including subcolumns in 'Sample and In Situ Testing'
+    # The merged cell in the header spans columns 1, 2, 3, but in the log area, all boundaries should be shown
     for idx, x_val in enumerate(log_col_x[1:-1], start=1):
-        if idx in (2, 3):
-            continue
         log_ax.plot([x_val, x_val], [0, 1], color="black", linewidth=1, zorder=20)
 
     # Optionally, draw a horizontal line at the top of the log area to match the header
@@ -376,13 +374,21 @@ def plot_dummy_borehole_log():
     desc_width = log_col_widths[7]
     log_depth = DUMMY_BOREHOLE_DATA["Depth_Base"].max()
 
-    def depth_to_y(depth):
-        return 1 - depth / log_depth
+    # Define the bottom line y position before any use
+    bottom_line_y = 0.025
 
+    def depth_to_y(depth):
+        # Map depth=0 to y=1, depth=log_depth to y=bottom_line_y
+        return 1 - (1 - bottom_line_y) * (depth / log_depth)
+
+    ground_level = 62.5  # Top of borehole (Level AoD)
     for i, row in DUMMY_BOREHOLE_DATA.iterrows():
         y_top = depth_to_y(row["Depth_Top"])
         y_base = depth_to_y(row["Depth_Base"])
         y_center = (y_top + y_base) / 2
+        # For the last section, force y_base to bottom_line_y
+        if i == len(DUMMY_BOREHOLE_DATA) - 1:
+            y_base = bottom_line_y
         # Draw lithology bar (color/hatch) filling the entire Legend column
         log_ax.add_patch(
             MplRectangle(
@@ -424,8 +430,11 @@ def plot_dummy_borehole_log():
         # Draw depth values in the Depth (m) column (index 4)
         depth_left = log_col_x[4]
         depth_width = log_col_widths[4]
-        # Only display the top depth for the first section, and only the base depth for each section
-        if i == 0:
+        # Draw level values in the Level (m) column (index 5)
+        level_left = log_col_x[5]
+        level_width = log_col_widths[5]
+        # Only display the top depth and level for the first section, and only the base depth and level for each section
+        if i == 0 and row["Depth_Top"] > 0:
             log_ax.text(
                 depth_left + depth_width / 2,
                 y_top,
@@ -437,12 +446,40 @@ def plot_dummy_borehole_log():
                 fontname="Arial",
                 zorder=3,
             )
-        # Always display the base depth at the bottom of each section
+            log_ax.text(
+                level_left + level_width / 2,
+                y_top,
+                f"{ground_level - row['Depth_Top']:.2f}",
+                va="bottom",
+                ha="center",
+                fontsize=8,
+                color="black",
+                fontname="Arial",
+                zorder=3,
+            )
+        # Always display the base depth and level at the bottom of each section
+        base_va = "top"
+        base_y = y_base
+        # For the last section, align base values just above the bottom line
+        if i == len(DUMMY_BOREHOLE_DATA) - 1:
+            base_va = "bottom"
+            base_y = bottom_line_y - 0.002
         log_ax.text(
             depth_left + depth_width / 2,
-            y_base,
+            base_y,
             f"{row['Depth_Base']:.2f}",
-            va="top",
+            va=base_va,
+            ha="center",
+            fontsize=8,
+            color="black",
+            fontname="Arial",
+            zorder=3,
+        )
+        log_ax.text(
+            level_left + level_width / 2,
+            base_y,
+            f"{ground_level - row['Depth_Base']:.2f}",
+            va=base_va,
             ha="center",
             fontsize=8,
             color="black",
@@ -457,6 +494,65 @@ def plot_dummy_borehole_log():
                 color="black",
                 linewidth=1,
                 zorder=15,
+            )
+
+    # --- Add horizontal line just above the bottom through legend and description columns ---
+    # This line will be at a small y offset above 0 (e.g., y=bottom_line_y)
+    log_ax.plot(
+        [legend_left, desc_left + desc_width],
+        [bottom_line_y, bottom_line_y],
+        color="black",
+        linewidth=1,
+        zorder=16,
+    )
+
+    # --- Add ruler axis with 10 markers (1-10) in the rightmost column, left-aligned, with decimal subticks ---
+    ruler_left = log_col_x[8]
+    ruler_width = log_col_widths[8]
+    ruler_x = ruler_left
+    log_ax.plot([ruler_x, ruler_x], [0, 1], color="black", linewidth=1.2, zorder=30)
+    main_tick_length = ruler_width * 0.5
+    sub_tick_length = ruler_width * 0.25
+    # For 10 main markers, align the 10th marker to bottom_line_y
+    for marker in range(1, 11):
+        if marker < 10:
+            y_marker = 1 - (1 - bottom_line_y) * (marker / 10)
+        else:
+            y_marker = bottom_line_y
+        log_ax.plot(
+            [ruler_x, ruler_x + main_tick_length],
+            [y_marker, y_marker],
+            color="black",
+            linewidth=1.1,
+            zorder=31,
+        )
+        log_ax.text(
+            ruler_x + main_tick_length + ruler_width * 0.1,
+            y_marker,
+            f"{marker}",
+            va="center",
+            ha="left",
+            fontsize=8,
+            color="black",
+            fontname="Arial",
+            zorder=32,
+        )
+    # Add decimal subticks (0.1 to 0.9 between each main marker), align last group to bottom_line_y
+    for i in range(10):
+        for sub in range(1, 10):
+            if i < 9:
+                y_subtick = 1 - (1 - bottom_line_y) * ((i + sub / 10) / 10)
+            else:
+                # For last group, interpolate between marker 9 and bottom_line_y
+                y_top = 1 - (1 - bottom_line_y) * (9 / 10)
+                y_bot = bottom_line_y
+                y_subtick = y_top - (y_top - y_bot) * (sub / 10)
+            log_ax.plot(
+                [ruler_x, ruler_x + sub_tick_length],
+                [y_subtick, y_subtick],
+                color="black",
+                linewidth=0.7,
+                zorder=30,
             )
 
     # Save as A4-sized PNG image with 300 DPI
