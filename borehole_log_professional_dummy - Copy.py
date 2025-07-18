@@ -66,7 +66,7 @@ def draw_header(ax):
     tmp_fig = plt.figure(figsize=(8, 2))
     tmp_ax = tmp_fig.add_subplot(111)
     renderer = tmp_fig.canvas.get_renderer()
-    fontprops = mpl.font_manager.FontProperties(size=8)
+    fontprops = mpl.font_manager.FontProperties(family="Arial", size=8)
     cell_padd = 12  # pixels, padding left and right
 
     # Top 3 rows
@@ -105,9 +105,11 @@ def draw_header(ax):
         )
         for i in range(3)
     ]
-    # For the bottom row (6 columns), use its own widths
-    bottom_col_widths_px = max_bottom_widths
-    # For a simple fix, set total width as sum of bottom row widths (since that's the widest)
+    # For the bottom row (6 columns), use its own widths, but make each cell half the width of the cells above
+    # Calculate the average width of the top row columns
+    avg_top_col_width = sum(top_col_widths_px) / 3
+    # Each bottom cell is half the width of a top cell
+    bottom_col_widths_px = [avg_top_col_width / 2] * 6
     col_widths_px = bottom_col_widths_px
     total_width_px = sum(col_widths_px)
     dpi = tmp_fig.dpi
@@ -149,8 +151,9 @@ def draw_header(ax):
                     label,
                     va="top",
                     ha="left",
-                    fontsize=8,  # Increased font size
+                    fontsize=8,
                     fontweight="bold",
+                    fontname="Arial",
                 )
 
             # Value (normal, lower part of cell)
@@ -161,7 +164,8 @@ def draw_header(ax):
                     value,
                     va="top",
                     ha="left",
-                    fontsize=8,  # Increased font size
+                    fontsize=8,
+                    fontname="Arial",
                 )
 
     # Draw bottom row rectangles and text
@@ -193,8 +197,9 @@ def draw_header(ax):
             title_text,
             va="top",
             ha="center",
-            fontsize=8,  # Increased font size
+            fontsize=8,
             fontweight="bold",
+            fontname="Arial",
         )
         # Draw value (centered horizontally, lower in cell)
         ax.text(
@@ -203,7 +208,8 @@ def draw_header(ax):
             bottom_values[i],
             va="top",
             ha="center",
-            fontsize=8,  # Increased font size
+            fontsize=8,
+            fontname="Arial",
         )
         x += col_width
 
@@ -212,7 +218,7 @@ def draw_header(ax):
 
     # Define column widths for the new row (adjusted for better text fitting)
     # Increased proportions to accommodate longer text while maintaining relationships
-    new_col_widths = [0.08, 0.12, 0.08, 0.12, 0.08, 0.08, 0.08, 0.32, 0.04]
+    new_col_widths = [0.05, 0.10, 0.06, 0.12, 0.08, 0.08, 0.10, 0.37, 0.04]
     # Well, Depth, Type, Results, Depth, Level, Legend, Stratum, Empty
     new_col_labels = [
         "Well",
@@ -250,8 +256,9 @@ def draw_header(ax):
                 "Sample and In Situ Testing",
                 va="top",
                 ha="center",
-                fontsize=8,  # Increased font size
+                fontsize=8,
                 fontweight="bold",
+                fontname="Arial",
             )
             # Draw horizontal line to separate merged header from sub-headers
             ax.plot(
@@ -269,8 +276,9 @@ def draw_header(ax):
                 label,
                 va="top",
                 ha="center",
-                fontsize=7,  # Increased font size
+                fontsize=7,
                 fontweight="bold",
+                fontname="Arial",
             )
         elif label:  # Other column labels
             ax.text(
@@ -279,8 +287,9 @@ def draw_header(ax):
                 label,
                 va="center",
                 ha="center",
-                fontsize=8,  # Increased font size
+                fontsize=8,
                 fontweight="bold",
+                fontname="Arial",
             )
 
         x += col_width
@@ -333,21 +342,38 @@ def plot_dummy_borehole_log():
     )
     from matplotlib.patches import Rectangle as MplRectangle
 
+    # Draw a black border around the log plot area
     log_ax.add_patch(
-        MplRectangle((0, 0), 1, 1, fill=False, edgecolor="red", linewidth=1, zorder=10)
+        MplRectangle(
+            (0, 0), 1, 1, fill=False, edgecolor="black", linewidth=1, zorder=10
+        )
     )
     log_ax.set_xlim(0, 1)
     log_ax.set_ylim(0, 1)
     log_ax.axis("off")
+
+    # Use the same column widths as the last (new) row in the header for the log plot area
+    log_col_widths = [0.05, 0.10, 0.06, 0.12, 0.08, 0.08, 0.10, 0.37, 0.04]
+    log_col_x = [0]
+    for w in log_col_widths:
+        log_col_x.append(log_col_x[-1] + w)
+
+    # Draw vertical lines for each column boundary, skipping those that would cut through the merged 'Sample and In Situ Testing' cell
+    # The merged cell spans columns 1, 2, 3 (indices 1, 2, 3), so skip boundaries at log_col_x[2] and log_col_x[3]
+    for idx, x_val in enumerate(log_col_x[1:-1], start=1):
+        if idx in (2, 3):
+            continue
+        log_ax.plot([x_val, x_val], [0, 1], color="black", linewidth=1, zorder=20)
+
+    # Optionally, draw a horizontal line at the top of the log area to match the header
+    log_ax.plot([0, 1], [1, 1], color="black", linewidth=1, zorder=20)
+
     # Now plot the lithology bars and text in the log area, using the same normalized coordinates
-    col_props = [0.08, 0.12, 0.08, 0.12, 0.08, 0.08, 0.08, 0.32, 0.04]
-    col_x = [0]
-    for w in col_props:
-        col_x.append(col_x[-1] + w)
-    bar_left = col_x[7]
-    bar_width = col_props[7]
-    desc_x = bar_left + 0.01
-    code_x = bar_left + bar_width * 0.15
+    # Legend column (index 6) and Stratum Description column (index 7)
+    legend_left = log_col_x[6]
+    legend_width = log_col_widths[6]
+    desc_left = log_col_x[7]
+    desc_width = log_col_widths[7]
     log_depth = DUMMY_BOREHOLE_DATA["Depth_Base"].max()
 
     def depth_to_y(depth):
@@ -357,10 +383,11 @@ def plot_dummy_borehole_log():
         y_top = depth_to_y(row["Depth_Top"])
         y_base = depth_to_y(row["Depth_Base"])
         y_center = (y_top + y_base) / 2
+        # Draw lithology bar (color/hatch) filling the entire Legend column
         log_ax.add_patch(
             MplRectangle(
-                (bar_left + bar_width * 0.025, y_base),
-                bar_width * 0.95,
+                (legend_left, y_base),
+                legend_width,
                 y_top - y_base,
                 facecolor="#b0c4de",
                 edgecolor="black",
@@ -368,27 +395,69 @@ def plot_dummy_borehole_log():
                 zorder=2,
             )
         )
+        # Draw geology code centered in the Legend column
         log_ax.text(
-            code_x,
+            legend_left + legend_width / 2,
             y_center,
             f"{row['Geology_Code']}",
             va="center",
-            ha="left",
+            ha="center",
             fontsize=8,
             color="black",
             fontweight="bold",
+            fontname="Arial",
             zorder=3,
         )
+        # Draw description text within the Stratum Description column
         log_ax.text(
-            desc_x + bar_width * 0.18,
+            desc_left + desc_width * 0.02,
             y_center,
             row["Description"],
             va="center",
             ha="left",
-            fontsize=7,
+            fontsize=8,
             color="black",
+            fontname="Arial",
+            zorder=3,
+            wrap=True,
+        )
+        # Draw depth values in the Depth (m) column (index 4)
+        depth_left = log_col_x[4]
+        depth_width = log_col_widths[4]
+        # Only display the top depth for the first section, and only the base depth for each section
+        if i == 0:
+            log_ax.text(
+                depth_left + depth_width / 2,
+                y_top,
+                f"{row['Depth_Top']:.2f}",
+                va="bottom",
+                ha="center",
+                fontsize=8,
+                color="black",
+                fontname="Arial",
+                zorder=3,
+            )
+        # Always display the base depth at the bottom of each section
+        log_ax.text(
+            depth_left + depth_width / 2,
+            y_base,
+            f"{row['Depth_Base']:.2f}",
+            va="top",
+            ha="center",
+            fontsize=8,
+            color="black",
+            fontname="Arial",
             zorder=3,
         )
+        # Draw a horizontal line dividing the lithology/description sections
+        if i > 0:
+            log_ax.plot(
+                [legend_left, desc_left + desc_width],
+                [y_base, y_base],
+                color="black",
+                linewidth=1,
+                zorder=15,
+            )
 
     # Save as A4-sized PNG image with 300 DPI
     fig.savefig("borehole_log_output.png", dpi=300, bbox_inches="tight")
