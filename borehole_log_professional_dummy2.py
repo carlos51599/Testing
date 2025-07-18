@@ -301,180 +301,100 @@ def plot_dummy_borehole_log():
     # A4 width is 8.27 inches, minus margins (0.5" each side) = 7.27" usable
     a4_width_in = 8.27
     a4_height_in = 11.69
-    left_margin_in = 0.5
-    right_margin_in = 0.5
+    a4_usable_width = a4_width_in - 0.5 * 2  # 0.5" left/right margins
+    # Define all vertical elements in inches
     top_margin_in = 0.3
     header_height_in = 2.0
     bottom_margin_in = 0.3
     # Log area is the rest of the page
     log_area_in = a4_height_in - (top_margin_in + header_height_in + bottom_margin_in)
-    log_area_top_in = a4_height_in - top_margin_in - header_height_in
+    # Determine the maximum depth and number of pages
     log_depth = float(DUMMY_BOREHOLE_DATA["Depth_Base"].max())
+    last_borehole_page = int(np.ceil(log_depth / 10.0))
 
-    # --- SCALE HANDLING ---
-    # Input scale: e.g., 1:50 (1 cm on paper = 50 cm in reality)
-    # For this example, use 1:50 as in the header
-    input_scale = 50  # 1:50 (1 mm on paper = 50 mm in reality)
-    # 1 inch = 25.4 mm
-    log_area_mm = log_area_in * 25.4
-    # Depth per page in mm: log_area_mm * scale (in m/mm)
-    # 1 mm on paper = 50 mm in reality = 0.05 m
-    mm_to_m = input_scale / 1000  # 50/1000 = 0.05 m per mm
-    depth_per_page = log_area_mm * mm_to_m
-
-    last_borehole_page = int(np.ceil(log_depth / depth_per_page))
     for page_num in range(1, last_borehole_page + 1):
-        # Column setup in inches (proportional to a4_usable_width)
-        log_col_widths_in = [0.05, 0.10, 0.06, 0.12, 0.08, 0.08, 0.10, 0.37, 0.04]
-        total_col_width = sum(log_col_widths_in)
-        a4_usable_width = a4_width_in - left_margin_in - right_margin_in
-        scale = a4_usable_width / total_col_width
-        log_col_widths = [w * scale for w in log_col_widths_in]
-        log_col_x = [0]
-        for w in log_col_widths:
-            log_col_x.append(log_col_x[-1] + w)
-        page_top = (page_num - 1) * depth_per_page
-        page_bot = (
-            page_num * depth_per_page
-        )  # Always a full interval for scale, even on last page
-        page_data_bot = min(page_bot, log_depth)  # Actual data ends here
-        fig = plt.figure(figsize=(a4_width_in, a4_height_in))
-        # Header axes (absolute units, top of page)
+        page_top = (page_num - 1) * 10
+        page_bot = page_num * 10
+        # Always use full A4 page size for every page
+        fig_width_in = a4_usable_width
+        fig_height_in = a4_height_in
+        # Horizontal margins as fraction of width
+        margin_frac = 0.5 / a4_width_in
+        axes_left = margin_frac
+        axes_width = 1 - 2 * margin_frac
+        # Vertical positions as fraction of height
+        top_margin_frac = top_margin_in / a4_height_in
+        header_height_frac = header_height_in / a4_height_in
+        log_height_frac = log_area_in / a4_height_in
+        bottom_margin_frac = bottom_margin_in / a4_height_in
+        fig = plt.figure(figsize=(fig_width_in, fig_height_in))
+        # Header axes: start below top margin
         header_ax = fig.add_axes(
             [
-                left_margin_in / a4_width_in,
-                (a4_height_in - top_margin_in - header_height_in) / a4_height_in,
-                a4_usable_width / a4_width_in,
-                header_height_in / a4_height_in,
+                axes_left,
+                1 - top_margin_frac - header_height_frac,
+                axes_width,
+                header_height_frac,
             ]
         )
         draw_header(header_ax)
         header_ax.set_xlim(0, 1)
         header_ax.set_ylim(0, 1)
         header_ax.axis("off")
-
-        # Log area axes (absolute units, below header)
+        # Log axes: start below header, above bottom margin
         log_ax = fig.add_axes(
             [
-                left_margin_in / a4_width_in,
-                bottom_margin_in / a4_height_in,
-                a4_usable_width / a4_width_in,
-                log_area_in / a4_height_in,
+                axes_left,
+                bottom_margin_frac,
+                axes_width,
+                log_height_frac,
             ]
         )
-        log_ax.set_xlim(0, a4_usable_width)
-        log_ax.set_ylim(0, log_area_in)
+        from matplotlib.patches import Rectangle as MplRectangle
+
+        log_ax.add_patch(
+            MplRectangle(
+                (0, 0), 1, 1, fill=False, edgecolor="black", linewidth=1, zorder=10
+            )
+        )
+        log_ax.set_xlim(0, 1)
+        log_ax.set_ylim(0, 1)
         log_ax.axis("off")
 
-        # Draw log area bounding box
-        log_box = [0, 0, a4_usable_width, log_area_in]
-        rect = Rectangle(
-            (log_box[0], log_box[1]),
-            log_box[2],
-            log_box[3],
-            fill=False,
-            edgecolor="black",
-            linewidth=1.5,
-        )
-        log_ax.add_patch(rect)
-
-        # Draw columns (absolute)
+        # Column setup
+        log_col_widths = [0.05, 0.10, 0.06, 0.12, 0.08, 0.08, 0.10, 0.37, 0.04]
+        log_col_x = [0]
+        for w in log_col_widths:
+            log_col_x.append(log_col_x[-1] + w)
         for idx, x_val in enumerate(log_col_x[1:-1], start=1):
-            log_ax.plot([x_val, x_val], [0, log_area_in], color="black", linewidth=1)
-        # Top line of log area
-        log_ax.plot(
-            [0, a4_usable_width], [log_area_in, log_area_in], color="black", linewidth=1
-        )
-
-        # Draw toe line (solid black) always, only across legend and description columns
-        # Draw fixed toe line (visual ruler reference) as before
-        toe_y = 0.10  # 0.10 inches above bottom
-        legend_left = log_col_x[6]
-        legend_right = log_col_x[8]  # right edge of description column
-        log_ax.plot(
-            [legend_left, legend_right],
-            [toe_y, toe_y],
-            color="black",
-            linewidth=1.5,
-            zorder=10,
-        )
-
-        # Draw a new line at the end of the borehole (if it ends in the middle of the page), across legend and description columns
-        borehole_end_on_page = (page_data_bot < page_bot)
-        if borehole_end_on_page:
-            borehole_end_y = log_area_in * (1 - (page_data_bot - page_top) / (page_bot - page_top))
-            log_ax.plot(
-                [legend_left, legend_right],
-                [borehole_end_y, borehole_end_y],
-                color="black",
-                linewidth=1.5,
-                zorder=11,
-            )
-
-        # Draw fixed visual ruler: 0 at top, 10 at toe line, evenly spaced, not tied to data or page variables
-        ruler_left = log_col_x[8]
-        ruler_width = log_col_widths[8]
-        ruler_x = ruler_left
-        log_ax.plot([ruler_x, ruler_x], [0, log_area_in], color="black", linewidth=1.2)
-        main_tick_length = ruler_width * 0.5
-        sub_tick_length = ruler_width * 0.25
-
-        # Ruler: page range is 0-10, 10-20, 20-30, etc. for each page, with decimal subticks
-        page_ruler_start = (page_num - 1) * 10
-        # Main ticks and labels at every integer, but skip the first marker number
-        for i in range(0, 11):
-            y_tick = toe_y + (log_area_in - toe_y) * (1 - i / 10)
-            label_val = page_ruler_start + i
-            log_ax.plot(
-                [ruler_x, ruler_x + main_tick_length],
-                [y_tick, y_tick],
-                color="black",
-                linewidth=1.1,
-            )
-            # Skip the first marker number (0, 10, 20, ...)
-            if i != 0:
-                log_ax.text(
-                    ruler_x + main_tick_length + ruler_width * 0.1,
-                    y_tick,
-                    f"{label_val}",
-                    va="center",
-                    ha="left",
-                    fontsize=8,
-                    color="black",
-                    fontname="Arial",
-                )
-            # Decimal subticks (every 0.1 unit, except at main ticks)
-            if i < 10:
-                for j in range(1, 10):
-                    frac = j / 10
-                    y_subtick = toe_y + (log_area_in - toe_y) * (1 - (i + frac) / 10)
-                    log_ax.plot(
-                        [ruler_x, ruler_x + sub_tick_length * 0.7],
-                        [y_subtick, y_subtick],
-                        color="black",
-                        linewidth=0.5,
-                    )
-
-        # Draw lithology bars (scaled to log area)
-        def depth_to_y_abs(depth):
-            # Map depth to y in inches within the log area, scaled to page depth (always same for all pages)
-            return log_area_in * (1 - (depth - page_top) / (page_bot - page_top))
+            log_ax.plot([x_val, x_val], [0, 1], color="black", linewidth=1, zorder=20)
+        log_ax.plot([0, 1], [1, 1], color="black", linewidth=1, zorder=20)
 
         legend_left = log_col_x[6]
         legend_width = log_col_widths[6]
         desc_left = log_col_x[7]
         desc_width = log_col_widths[7]
+        bottom_line_y = 0.025
 
+        def depth_to_y(depth):
+            # Map depth to y coordinate based on fixed 10m page scale
+            # The page always represents exactly 10m of depth (0-10, 10-20, etc.)
+            page_depth_range = 10.0  # Always 10m per page regardless of borehole length
+            return 1 - (1 - bottom_line_y) * ((depth - page_top) / page_depth_range)
+
+        ground_level = 62.5  # Top of borehole (Level AoD)
+
+        # Find all intervals that overlap this page, splitting if needed
         intervals = []
         for i, row in DUMMY_BOREHOLE_DATA.iterrows():
             d1 = row["Depth_Top"]
             d2 = row["Depth_Base"]
+            # If the interval is entirely above or below this page, skip
             if d2 <= page_top or d1 >= page_bot:
                 continue
+            # Clamp to page boundaries
             seg_top = max(d1, page_top)
-            seg_base = min(d2, page_data_bot)  # Only plot up to actual data
-            if seg_top >= seg_base:
-                continue
+            seg_base = min(d2, page_bot)
             intervals.append(
                 {
                     "orig_idx": i,
@@ -487,15 +407,19 @@ def plot_dummy_borehole_log():
                 }
             )
 
+        # Draw each interval
         for j, seg in enumerate(intervals):
-            # Clip lithology at toe_y for all pages
-            y_top = depth_to_y_abs(seg["Depth_Top"])
-            y_base = depth_to_y_abs(seg["Depth_Base"])
-            y_base_clipped = max(y_base, toe_y)
+            y_top = depth_to_y(seg["Depth_Top"])
+            y_base = depth_to_y(seg["Depth_Base"])
+            # Clip the lithology/description bars at the horizontal line if borehole ends before page bottom
+            borehole_end_depth = min(log_depth, page_top + 10)
+            borehole_end_y = depth_to_y(borehole_end_depth)
+            # Only draw down to the lesser of y_base and borehole_end_y
+            y_base_clipped = max(y_base, borehole_end_y)
+            # Only draw if the clipped bar has positive height
             if y_top > y_base_clipped:
-                # Draw lithology rectangle
                 log_ax.add_patch(
-                    Rectangle(
+                    MplRectangle(
                         (legend_left, y_base_clipped),
                         legend_width,
                         y_top - y_base_clipped,
@@ -505,10 +429,8 @@ def plot_dummy_borehole_log():
                         zorder=2,
                     )
                 )
+                # Draw geology code and description at the center of the visible bar
                 y_center = (y_top + y_base_clipped) / 2
-                # For depth/level values, align with base (bottom) of interval
-                y_base_label = max(y_base, y_base_clipped)
-                # Draw geology code in legend column
                 log_ax.text(
                     legend_left + legend_width / 2,
                     y_center,
@@ -521,7 +443,6 @@ def plot_dummy_borehole_log():
                     fontname="Arial",
                     zorder=3,
                 )
-                # Draw description in description column
                 log_ax.text(
                     desc_left + desc_width * 0.02,
                     y_center,
@@ -534,43 +455,147 @@ def plot_dummy_borehole_log():
                     zorder=3,
                     wrap=True,
                 )
-                # Draw depth (base) value in Depth column (col 4)
-                depth_col_left = log_col_x[4]
-                depth_col_width = log_col_widths[4]
+            # Depth and level columns (index 4 and 5)
+            depth_left = log_col_x[4]
+            depth_width = log_col_widths[4]
+            level_left = log_col_x[5]
+            level_width = log_col_widths[5]
+            # Show top value only if it's the actual start of the stratum (not a page split)
+            show_top = abs(seg["Depth_Top"] - seg["orig_Depth_Top"]) < 1e-6
+            if show_top and seg["Depth_Top"] > 0:
                 log_ax.text(
-                    depth_col_left + depth_col_width / 2,
-                    y_base_label,
+                    depth_left + depth_width / 2,
+                    y_top,
+                    f"{seg['Depth_Top']:.2f}",
+                    va="bottom",
+                    ha="center",
+                    fontsize=8,
+                    color="black",
+                    fontname="Arial",
+                    zorder=3,
+                )
+                log_ax.text(
+                    level_left + level_width / 2,
+                    y_top,
+                    f"{ground_level - seg['Depth_Top']:.2f}",
+                    va="bottom",
+                    ha="center",
+                    fontsize=8,
+                    color="black",
+                    fontname="Arial",
+                    zorder=3,
+                )
+            # Show base value only if it's the actual end of the stratum (not a page split)
+            show_base = abs(seg["Depth_Base"] - seg["orig_Depth_Base"]) < 1e-6
+            if show_base:
+                base_va = "top"
+                base_y = y_base
+                # If this is the actual end of the borehole (not just the end of a stratum),
+                # align the value with the end of the borehole, not the page bottom.
+                is_borehole_end = abs(seg["Depth_Base"] - log_depth) < 1e-6
+                if is_borehole_end:
+                    # Place at the actual end of the borehole
+                    base_va = "top"
+                    base_y = y_base
+                log_ax.text(
+                    depth_left + depth_width / 2,
+                    base_y,
                     f"{seg['Depth_Base']:.2f}",
-                    va="bottom",
+                    va=base_va,
                     ha="center",
                     fontsize=8,
                     color="black",
                     fontname="Arial",
                     zorder=3,
                 )
-                # Draw level (base) value in Level column (col 5)
-                level_col_left = log_col_x[5]
-                level_col_width = log_col_widths[5]
-                # For demo, assume ground level is 62.50 and subtract depth
-                base_level = 62.50 - seg["Depth_Base"]
                 log_ax.text(
-                    level_col_left + level_col_width / 2,
-                    y_base_label,
-                    f"{base_level:.2f}",
-                    va="bottom",
+                    level_left + level_width / 2,
+                    base_y,
+                    f"{ground_level - seg['Depth_Base']:.2f}",
+                    va=base_va,
                     ha="center",
                     fontsize=8,
                     color="black",
                     fontname="Arial",
                     zorder=3,
                 )
-                # Draw horizontal line at top of each stratum in description column
+            # Draw horizontal divider if not at page top
+            if j > 0:
                 log_ax.plot(
-                    [desc_left, desc_left + desc_width],
+                    [legend_left, desc_left + desc_width],
                     [y_top, y_top],
                     color="black",
-                    linewidth=0.8,
-                    zorder=4,
+                    linewidth=1,
+                    zorder=15,
+                )
+
+        # --- Add horizontal line at bottom of log if borehole ends before page bottom ---
+        borehole_end_depth = min(
+            log_depth, page_top + 10
+        )  # End of borehole on this page
+        if borehole_end_depth < page_top + 10:  # Borehole ends before page bottom
+            borehole_end_y = depth_to_y(borehole_end_depth)
+            log_ax.plot(
+                [legend_left, desc_left + desc_width],
+                [borehole_end_y, borehole_end_y],
+                color="black",
+                linewidth=1,
+                zorder=16,
+            )
+        else:
+            # --- Add horizontal line just above the bottom through legend and description columns ---
+            log_ax.plot(
+                [legend_left, desc_left + desc_width],
+                [bottom_line_y, bottom_line_y],
+                color="black",
+                linewidth=1,
+                zorder=16,
+            )
+
+        # --- Add ruler axis with 10m markers (0-10, 10-20, etc.) in the rightmost column, always full height ---
+        ruler_left = log_col_x[8]
+        ruler_width = log_col_widths[8]
+        ruler_x = ruler_left
+        log_ax.plot([ruler_x, ruler_x], [0, 1], color="black", linewidth=1.2, zorder=30)
+        main_tick_length = ruler_width * 0.5
+        sub_tick_length = ruler_width * 0.25
+
+        # Determine the marker range for this page (always 0-10, 10-20, ... for the plot area)
+        marker_start = (page_num - 1) * 10
+        marker_end = page_num * 10
+
+        # Draw main markers and labels (always 0-10, 10-20, etc. for the page)
+        for marker in range(marker_start, marker_end + 1):
+            y_marker = 1 - (1 - bottom_line_y) * ((marker - marker_start) / 10)
+            log_ax.plot(
+                [ruler_x, ruler_x + main_tick_length],
+                [y_marker, y_marker],
+                color="black",
+                linewidth=1.1,
+                zorder=31,
+            )
+            log_ax.text(
+                ruler_x + main_tick_length + ruler_width * 0.1,
+                y_marker,
+                f"{marker}",
+                va="center",
+                ha="left",
+                fontsize=8,
+                color="black",
+                fontname="Arial",
+                zorder=32,
+            )
+
+        # Decimal subticks (0.1 to 0.9 between each main marker)
+        for i in range(10):
+            for sub in range(1, 10):
+                y_subtick = 1 - (1 - bottom_line_y) * ((i + sub / 10) / 10)
+                log_ax.plot(
+                    [ruler_x, ruler_x + sub_tick_length],
+                    [y_subtick, y_subtick],
+                    color="black",
+                    linewidth=0.7,
+                    zorder=30,
                 )
 
         # Save as A4-sized PNG image with 300 DPI (always full page)
